@@ -1,11 +1,11 @@
 # PKCast
 
-PKCast is a project for probabilistic radar nowcasting on the SEVIR VIL dataset. It trains a VAE-style autoencoder to compress radar frames, encodes the raw SEVIR sequences into latent HDF5 files, then trains a Conditional Flow Matching model with a Cuboid Transformer UNet backbone to forecast future radar frames in latent space.
+PKCast does probabilistic radar nowcasting on the SEVIR VIL dataset. It trains a VAE-style autoencoder to compress radar frames, encodes raw SEVIR sequences into latent HDF5 files, then trains a Conditional Flow Matching model with a Cuboid Transformer UNet backbone to forecast future radar frames in latent space.
 
 
 ## Results
 
-The plots below were generated from the local MLflow SQLite store (`mlruns.db`) and the saved artifacts in `artifacts/sevir/`.
+The plots below came from the local MLflow SQLite store (`mlruns.db`) and the saved artifacts in `artifacts/sevir/`.
 
 ### Autoencoder training curves
 
@@ -13,7 +13,7 @@ The plots below were generated from the local MLflow SQLite store (`mlruns.db`) 
 
 ### VAE reconstructions
 
-These examples show validation reconstructions from the VAE over training.
+Validation reconstructions from the VAE at different points during training.
 
 **Early training**
 
@@ -52,12 +52,12 @@ These examples show validation reconstructions from the VAE over training.
 
 ## What is included
 
-- Distributed VAE training for SEVIR VIL frames.
-- Latent dataset generation from a trained autoencoder.
-- Distributed PKCast/CFM training on latent SEVIR sequences.
-- Single-sample inference that decodes forecasts and saves GIF and NPZ outputs.
-- Streaming nowcasting metrics and Cartopy-based visualization utilities.
-- Slurm launch scripts for autoencoder training, PKCast training, and inference.
+- Distributed VAE training for SEVIR VIL frames
+- Latent dataset generation from a trained autoencoder
+- Distributed PKCast/CFM training on latent SEVIR sequences
+- Single-sample inference that decodes forecasts and saves GIF and NPZ outputs
+- Streaming nowcasting metrics and Cartopy-based visualization utilities
+- Slurm launch scripts for autoencoder training, PKCast training, and inference
 
 ## Repository layout
 
@@ -89,13 +89,13 @@ conda activate nowcasting
 pip install -r requirements.txt
 ```
 
-Install a CUDA-compatible PyTorch build separately for your cluster or workstation. The training scripts also import `mlflow`, so install it if it is not already present in your environment:
+Install a CUDA-compatible PyTorch build separately for your cluster or workstation. The training scripts also import `mlflow`, so install it if it's not already in your environment:
 
 ```bash
 pip install mlflow
 ```
 
-For Cartopy visual overlays, the system may also need GEOS/PROJ dependencies installed through your package manager or Conda.
+For Cartopy visual overlays, you may also need GEOS/PROJ dependencies installed through your package manager or Conda.
 
 ## Data
 
@@ -103,7 +103,7 @@ The scripts expect SEVIR VIL data in HDF5 files with a dataset named `vil`, plus
 
 SEVIR VIL dataset download: https://registry.opendata.aws/sevir/
 
-The dataset is hosted in the public S3 bucket `s3://sevir`. To download only the VIL files and catalog with the AWS CLI:
+The dataset is in the public S3 bucket `s3://sevir`. To download only the VIL files and catalog with the AWS CLI:
 
 ```bash
 aws s3 cp --no-sign-request s3://sevir/CATALOG.csv CATALOG.csv
@@ -134,7 +134,7 @@ The default sequence configuration uses 13 input frames and predicts 12 future f
 
 ## Preprocessing and windowing
 
-The raw SEVIR catalog is first filtered to the `vil` image type, and events with more than 5% missing frames are removed. The remaining events are split by timestamp: training events occur before `2019-01-01 00:00:00`, validation events occur from `2019-01-01 00:00:00` up to `2019-06-01 00:00:00`, and testing events occur on or after `2019-06-01 00:00:00`. Each split is written to a compressed HDF5 file with a `vil` dataset, and the matching metadata CSV keeps event fields such as IDs, timestamps, projection bounds, and a `file_row` index for fast lookup. The preprocessing script also supports optional bicubic spatial downsampling through `--downsample_factor`.
+The raw SEVIR catalog is first filtered to the `vil` image type, and events with more than 5% missing frames are dropped. What remains gets split by timestamp: training events before `2019-01-01 00:00:00`, validation from `2019-01-01 00:00:00` up to `2019-06-01 00:00:00`, and testing from `2019-06-01 00:00:00` onward. Each split is written to a compressed HDF5 file with a `vil` dataset; the matching metadata CSV keeps event fields like IDs, timestamps, projection bounds, and a `file_row` index for fast lookup. The preprocessing script also supports optional bicubic spatial downsampling via `--downsample_factor`.
 
 ```bash
 python scripts/preprocess_data.py \
@@ -150,66 +150,65 @@ During training, each SEVIR event is treated as a 49-frame sequence. The dataset
 window_length = (lag_time + lead_time) * time_spacing
 ```
 
-With the default configuration, `lag_time=13`, `lead_time=12`, and `time_spacing=1`, so each window contains 25 frames. The first 13 frames become the model input, and the next 12 frames become the forecast target. The default stride is 12 frames, so a 49-frame event produces three windows starting at frames 0, 12, and 24. This turns one storm event into multiple supervised nowcasting examples while preserving temporal order.
+With the default configuration, `lag_time=13`, `lead_time=12`, and `time_spacing=1`, so each window has 25 frames. The first 13 become the model input; the next 12 become the forecast target. The default stride is 12 frames, so a 49-frame event produces three windows starting at frames 0, 12, and 24. This turns one storm event into multiple supervised nowcasting examples while preserving temporal order.
 
-After the VAE autoencoder is trained, `scripts/encode_dataset.py` reads the processed train and validation HDF5 files, normalizes frames when enabled in the autoencoder config, encodes every frame into the VAE latent space, and writes new latent HDF5 files under `datasets/sevir/data/sevir_latent_vae/`. PKCast then trains on these latent windows instead of directly forecasting full-resolution radar frames.
+After the VAE autoencoder is trained, `scripts/encode_dataset.py` reads the processed train and validation HDF5 files, normalizes frames when enabled in the autoencoder config, encodes every frame into the VAE latent space, and writes new latent HDF5 files under `datasets/sevir/data/sevir_latent_vae/`. PKCast then trains on these latent windows instead of forecasting full-resolution radar frames directly.
 
 ## End-to-end architecture
 
-PKCast is a two-stage latent nowcasting system. First, a VAE-style autoencoder learns a compact representation of individual VIL radar frames. Second, a Conditional Flow Matching model learns to generate the future latent sequence conditioned on the past latent sequence. At inference time, the system starts from Gaussian noise in the future latent space, integrates the learned vector field from `t=0` to `t=1`, and decodes the final latent forecast back to radar frames.
+PKCast is a two-stage latent nowcasting system. A VAE-style autoencoder first learns a compact representation of individual VIL radar frames. Then a Conditional Flow Matching model learns to generate the future latent sequence conditioned on the past. At inference time, the system starts from Gaussian noise in the future latent space, integrates the learned vector field from `t=0` to `t=1`, and decodes the final latent forecast back to radar frames.
 
 ```mermaid
-graph TD
-    A[Raw SEVIR VIL events - 49 frames per event] --> B[Preprocessing - filter VIL, remove events with over 5pct missing, split by date, write HDF5]
-    B --> C[Sliding windows - 13 input and 12 target frames, stride 12]
+flowchart TD
+    A["Raw SEVIR VIL events: 49 frames per event"] --> B["Preprocessing: filter VIL, remove over 5 percent missing, split by date, write HDF5"]
+    B --> C["Sliding windows: 13 input frames, 12 target frames, stride 12"]
 
-    C --> D[Normalize frames to 0-1 when enabled]
-    D --> E[AutoencoderKL Encoder - DownEncoderBlock2D x4, ch 128-256-512-512, latent ch 4]
-    E --> F[Latent posterior - mean and log variance]
-    F --> G[AutoencoderKL Decoder - UpDecoderBlock2D x4, reconstructed VIL frame]
-    G --> H[Autoencoder loss - L1-NLL, KL, PatchGAN adversarial after warmup]
-    D --> I[PatchGAN Discriminator - real vs reconstructed frame]
+    C --> D["Normalize frames to 0-1 when enabled"]
+    D --> E["AutoencoderKL encoder: DownEncoderBlock2D x4, channels 128-256-512-512, latent channels 4"]
+    E --> F["Latent posterior: mean and log variance"]
+    F --> G["AutoencoderKL decoder: UpDecoderBlock2D x4, reconstructed VIL frame"]
+    G --> H["Autoencoder loss: L1-NLL, KL, PatchGAN adversarial after warmup"]
+    D --> I["PatchGAN discriminator: real vs reconstructed frame"]
     G --> I
-    I --> J[Hinge discriminator loss]
+    I --> J["Hinge discriminator loss"]
 
-    E --> K[Encode all train and validation frames to latent HDF5]
-    K --> L[Latent input window - z cond, 13 past frames]
-    K --> M[Latent target window - z1, 12 future frames]
+    E --> K["Encode train and validation frames to latent HDF5"]
+    K --> L["Latent input window: z cond, 13 past frames"]
+    K --> M["Latent target window: z1, 12 future frames"]
 
-    N[Gaussian noise z0] --> O[CFM interpolation - zt is 1-t times z0 plus t times z1 plus sigma times eps]
+    N["Gaussian noise z0"] --> O["CFM interpolation: zt from z0 to z1 with sigma noise"]
     M --> O
-    O --> P[Target vector field - ut equals z1 minus z0]
+    O --> P["Target vector field: ut equals z1 minus z0"]
 
-    L --> Q1[Concatenate z cond and zt along time axis - 25 frames total]
+    L --> Q1["Concatenate z cond and zt along time axis"]
     O --> Q1
-    Q1 --> Q2[Append observation indicator channel - 1 for past, 0 for future]
-    Q2 --> Q3[Linear input projection to base units 192]
-    Q3 --> Q4[Add t plus h plus w positional embeddings]
-    R[Continuous time t] --> Q5[Time embedding MLP - sinusoidal then MLP, channels mult 4]
+    Q1 --> Q2["Append observation indicator channel"]
+    Q2 --> Q3["Linear input projection to 192 base units"]
+    Q3 --> Q4["Add time height width positional embeddings"]
+    R["Continuous time t"] --> Q5["Sinusoidal time embedding MLP"]
 
-    Q4 --> Q6[Encoder block 1 - 4x axial cuboid self-attention, 4 heads, GELU FFN, LayerNorm]
+    Q4 --> Q6["Encoder block 1: axial cuboid attention, 4 heads, GELU FFN, LayerNorm"]
     Q5 --> Q6
-    Q6 --> Q7[Patch merge downsample - factor 2 spatial]
-    Q7 --> Q8[Encoder block 2 - 4x axial cuboid self-attention, 4 heads, GELU FFN, LayerNorm]
+    Q6 --> Q7["Patch merge downsample: spatial factor 2"]
+    Q7 --> Q8["Encoder block 2: axial cuboid attention, 4 heads, GELU FFN, LayerNorm"]
     Q5 --> Q8
-    Q8 --> Q9[Patch upsample - factor 2 spatial]
-    Q6 --> Q10[U-Net skip connection]
+    Q8 --> Q9["Patch upsample: spatial factor 2"]
+    Q6 --> Q10["U-Net skip connection"]
     Q9 --> Q10
-    Q10 --> Q11[Decoder and up path - cuboid attention blocks with skip and time embedding]
+    Q10 --> Q11["Decoder and up path: cuboid attention with skip and time embedding"]
     Q5 --> Q11
-    Q11 --> S[Linear output projection - predicted vector field v theta]
+    Q11 --> S["Predicted vector field v theta"]
 
-    S --> T[CFM loss - MSE of v theta and u t]
+    S --> T["CFM loss: MSE between v theta and ut"]
     P --> T
 
-    Q11 --> QMODEL[Trained PKCast vector field model]
-    S --> QMODEL
-    N --> U[Inference ODE solve - Euler from t0 to t1]
+    S --> QMODEL["Trained PKCast vector field model"]
+    N --> U["Inference ODE solve: Euler from t0 to t1"]
     L --> U
     QMODEL --> U
-    U --> V[Predicted future latents - denormalize by stored mean and std]
-    V --> W[VAE decoder]
-    W --> X[Forecast VIL frames - clamp, save GIF and NPZ, compute metrics]
+    U --> V["Predicted future latents: denormalize by stored mean and std"]
+    V --> W["VAE decoder"]
+    W --> X["Forecast VIL frames: clamp, save GIF and NPZ, compute metrics"]
 
     classDef data fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
     classDef vae fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
@@ -228,29 +227,33 @@ graph TD
 
 ### Autoencoder stage
 
-The autoencoder is built with `diffusers.models.autoencoders.AutoencoderKL`. It receives single-channel VIL frames and reconstructs the same frame after passing through a 4-channel latent bottleneck. The configured encoder uses four `DownEncoderBlock2D` stages with channel widths `[128, 256, 512, 512]`, `silu` activations, group normalization with 32 groups, and two layers per block. The decoder mirrors this with four `UpDecoderBlock2D` stages. Training uses distributed data parallelism, AdamW, cosine warmup scheduling, gradient clipping, MLflow logging, and early stopping.
+The autoencoder is `diffusers.models.autoencoders.AutoencoderKL`. It takes single-channel VIL frames and reconstructs them after passing through a 4-channel latent bottleneck. The encoder has four `DownEncoderBlock2D` stages with channel widths `[128, 256, 512, 512]`, `silu` activations, group normalization with 32 groups, and two layers per block. The decoder mirrors this with four `UpDecoderBlock2D` stages. Training uses distributed data parallelism, AdamW, cosine warmup scheduling, gradient clipping, MLflow logging, and early stopping.
 
 The generator side of the autoencoder loss is:
 
 $$\mathcal{L}_{\text{AE}} = \mathcal{L}_{\text{NLL}} + \lambda_{\text{KL}}\,\mathcal{L}_{\text{KL}} + w_{\text{adapt}}\cdot d_{\text{factor}}\cdot\mathcal{L}_{\text{GAN}}$$
 
-where $\lambda_{\text{KL}} = 10^{-4}$ and `disc_weight=0.5` in `configs/autoencoder.yaml`. $\mathcal{L}_{\text{NLL}}$ is based on absolute reconstruction error with a learned scalar log variance. $\mathcal{L}_{\text{KL}}$ regularizes the posterior distribution from the VAE encoder. $\mathcal{L}_{\text{GAN}} = -\mathbb{E}[D(\hat{\mathbf{x}})]$ encourages sharper reconstructions once the discriminator is enabled.
+where $\lambda_{\text{KL}} = 10^{-4}$ and `disc_weight=0.5` in `configs/autoencoder.yaml`. The NLL term is based on absolute reconstruction error with a learned scalar log variance. The KL term regularizes the posterior from the VAE encoder. The adversarial generator term is:
 
-The discriminator is a 3-layer PatchGAN-style convolutional discriminator from `pkcast/autoencoder/losses/lpips.py`. It receives real VIL frames and reconstructed VIL frames and is trained with hinge loss:
+$$\mathcal{L}_{\text{GAN}} = -\mathbb{E}\left[D(\hat{\mathbf{x}})\right]$$
+
+This pushes toward sharper reconstructions once the discriminator is enabled.
+
+The discriminator is a 3-layer PatchGAN-style convolutional discriminator from `pkcast/autoencoder/losses/lpips.py`. It takes real and reconstructed VIL frames and trains with hinge loss:
 
 $$\mathcal{L}_{D} = \frac{1}{2}\,\mathbb{E}\!\left[\max(0,\, 1 - D(\mathbf{x}))\right] + \frac{1}{2}\,\mathbb{E}\!\left[\max(0,\, 1 + D(\hat{\mathbf{x}}))\right]$$
 
-The discriminator is inactive for the first `warmup_generator_epochs=35` epochs, so the autoencoder first learns stable reconstructions before adversarial training begins. After warmup, the training loop performs one generator update and one discriminator update per batch. The file name `lpips.py` and class name `LPIPSWithDiscriminator` come from the original perceptual/adversarial loss implementation, but this project's version explicitly removes the perceptual LPIPS term. In the current code, the active autoencoder losses are reconstruction/NLL, KL, and PatchGAN adversarial losses.
+The discriminator is off for the first `warmup_generator_epochs=35` epochs, so the autoencoder builds stable reconstructions before adversarial training kicks in. After warmup, each batch gets one generator update and one discriminator update. The file name `lpips.py` and class `LPIPSWithDiscriminator` come from the original perceptual/adversarial loss implementation, but the perceptual LPIPS term has been removed. The active losses are reconstruction/NLL, KL, and PatchGAN adversarial only.
 
 ### Latent dataset stage
 
-After the autoencoder is trained, `scripts/encode_dataset.py` loads the best autoencoder checkpoint and encodes each processed VIL event frame-by-frame. If `normalize_dataset` is enabled in the autoencoder config, frames are divided by 255 before encoding. The encoder posterior mode is used as the deterministic latent representation, then latents are saved to compressed HDF5 files with dataset name `vil`. The latent tensor layout is `(H_latent, W_latent, T, C_latent)`, where `C_latent=4`.
+After training, `scripts/encode_dataset.py` loads the best autoencoder checkpoint and encodes each processed VIL event frame-by-frame. If `normalize_dataset` is enabled in the autoencoder config, frames are divided by 255 before encoding. The encoder posterior mode is used as the deterministic latent, then latents are saved to compressed HDF5 files with dataset name `vil`. The latent tensor layout is `(H_latent, W_latent, T, C_latent)`, where `C_latent=4`.
 
 ### PKCast / CFM stage
 
-PKCast trains on latent windows instead of raw radar frames. The conditioning input is the 13-frame past latent sequence, and the target is the 12-frame future latent sequence. Before training, the latent training set mean and standard deviation are computed and stored in the model so both conditioning latents and target latents can be normalized consistently.
+PKCast trains on latent windows rather than raw radar frames. The conditioning input is the 13-frame past latent sequence and the target is the 12-frame future latent sequence. Before training, the latent training set mean and standard deviation are computed and stored in the model so both conditioning and target latents are normalized consistently.
 
-The forecasting model is `CuboidTransformerUNet`, a U-Net-style spatiotemporal transformer adapted from Cuboid Transformer / PreDiff-style blocks. It concatenates the observed latent sequence and the noisy future latent state along time, appends an observation indicator channel that marks past frames as observed and future frames as generated, projects the tensor into `base_units=192`, adds `t+h+w` positional embeddings, and injects a continuous-time embedding into each block. The configured network uses two resolution levels with depth `[4, 4]`, axial cuboid self-attention, 4 attention heads, patch-merge downsampling, 3D upsampling, relative position encoding, GELU feed-forward layers, and U-Net residual connections.
+The forecasting model is `CuboidTransformerUNet`, a U-Net-style spatiotemporal transformer adapted from Cuboid Transformer / PreDiff-style blocks. It concatenates the observed latent sequence and the noisy future latent state along time, appends an observation indicator channel marking past frames as observed and future frames as generated, projects the tensor into `base_units=192`, adds `t+h+w` positional embeddings, and injects a continuous-time embedding into each block. The network has two resolution levels with depth `[4, 4]`, axial cuboid self-attention, 4 attention heads, patch-merge downsampling, 3D upsampling, relative position encoding, GELU feed-forward layers, and U-Net residual connections.
 
 Conditional Flow Matching trains the model to predict a vector field that transports random Gaussian noise into the target future latent sequence. For each batch:
 
@@ -262,7 +265,7 @@ $$\mathbf{u}_t = \mathbf{z}_1 - \mathbf{z}_0$$
 
 $$\mathcal{L}_{\text{CFM}} = \mathbb{E}\!\left[\left\| v_\theta(t,\, \mathbf{z}_t,\, \mathbf{z}_{\text{cond}}) - \mathbf{u}_t \right\|^2\right]$$
 
-The current CFM config uses the vanilla flow matcher with `sigma=0.01`. Training uses AdamW, cosine warmup scheduling, mixed precision, gradient accumulation support, gradient clipping, EMA model tracking with decay `0.999`, MLflow logging, validation loss, early stopping on `partial_csi_m`, and optional partial evaluation. During partial evaluation and inference, the model samples future latents by solving the learned ODE from Gaussian noise:
+The current CFM config uses the vanilla flow matcher with `sigma=0.01`. Training uses AdamW, cosine warmup scheduling, mixed precision, gradient accumulation, gradient clipping, EMA model tracking with decay `0.999`, MLflow logging, validation loss, early stopping on `partial_csi_m`, and optional partial evaluation. During partial evaluation and inference, the model samples future latents by solving the learned ODE from Gaussian noise:
 
 $$\frac{d\mathbf{z}}{dt} = v_\theta\!\left(t,\, \mathbf{z},\, \mathbf{z}_{\text{cond}}\right), \qquad \mathbf{z}(0) \sim \mathcal{N}(\mathbf{0}, \mathbf{I}), \qquad \hat{\mathbf{z}}_1 = \mathbf{z}(1)$$
 
@@ -272,15 +275,15 @@ The implementation uses Euler integration from `t=0` to `t=1`, denormalizes the 
 
 ### Conditional Flow Matching vs diffusion models
 
-Both diffusion models and flow matching start from the same goal: learn to turn random Gaussian noise into data samples. The difference is *how* they define the path between noise and data, and what the model is trained to predict.
+Both diffusion models and flow matching start from the same goal: learn to turn random Gaussian noise into data samples. Where they differ is *how* they define the path between noise and data, and what the model is trained to predict.
 
 #### The taxi dispatcher analogy
 
-Imagine you are a taxi dispatcher. You have drivers (noise samples $\mathbf{z}_0$) scattered randomly across a country, and you need to get each one to a specific city (data sample $\mathbf{z}_1$).
+Picture yourself as a taxi dispatcher. You have drivers (noise samples $\mathbf{z}_0$) scattered randomly across a country, and you need to get each one to a specific city (data sample $\mathbf{z}_1$).
 
-**Diffusion models** first destroy all the roads — scatter every driver into pure chaos over ~1000 steps using a fixed noisy schedule. Then train a model to reverse that destruction step by step. The reversal is hard because at each step the model only gets a noisy signal about where to go, and the signal gets weaker near the start of generation.
+**Diffusion models** first destroy all the roads — scatter every driver into pure chaos over ~1000 steps using a fixed noisy schedule — then train a model to reverse that destruction step by step. The reversal is hard because at each step the model only gets a noisy signal about where to go, and the signal gets weaker near the start of generation.
 
-**Conditional Flow Matching** draws a straight road directly from each driver to their destination. It trains a model to predict the direction of that road (the vector field). At inference, release a new driver from a random location and let the model push them to a destination in one smooth continuous trip.
+**Conditional Flow Matching** draws a straight road directly from each driver to their destination. It trains a model to predict the direction of that road (the vector field). At inference, release a new driver from a random location and let the model push them to their destination in one smooth continuous trip.
 
 #### Mathematics
 
@@ -290,7 +293,7 @@ $$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t}
 
 $$\mathcal{L}_{\text{diff}} = \left\| \boldsymbol{\varepsilon}_\theta(\mathbf{x}_t, t) - \boldsymbol{\varepsilon} \right\|^2$$
 
-The noise schedule is fixed (cosine or linear), uses ~1000 steps, and paths curve through a high-entropy space. The target $\boldsymbol{\varepsilon}$ is indirect — the model predicts the noise that was added, not the direction toward the data.
+The noise schedule is fixed (cosine or linear), uses ~1000 steps, and paths curve through a high-entropy space. The target $\boldsymbol{\varepsilon}$ is indirect: the model predicts the noise that was added, not the direction toward the data.
 
 Flow Matching trains a model to predict a **vector field** $\mathbf{u}_t$ that points directly from noise toward data along a straight line. For $t \in [0, 1]$:
 
@@ -315,13 +318,13 @@ The target direction $\mathbf{u}_t = \mathbf{z}_1 - \mathbf{z}_0$ is **analytica
 
 #### Why CFM suits spatiotemporal forecasting
 
-Each inference step in PKCast is a full CuboidTransformer forward pass over a $48 \times 48 \times 25 \times 4$ latent tensor. At 10 Euler steps vs 1000 diffusion steps, the cost difference is 100×. Straight paths also avoid the high-noise regime where diffusion models lose spatial coherence — important for preserving storm cell structure across 12 forecast frames.
+Each inference step in PKCast is a full CuboidTransformer forward pass over a $48 \times 48 \times 25 \times 4$ latent tensor. At 10 Euler steps vs 1000 diffusion steps, that's a 100× cost difference. Straight paths also skip the high-noise regime where diffusion models lose spatial coherence, which matters when you need to preserve storm cell structure across 12 forecast frames.
 
 ---
 
 ### Euler integration for ODE solving
 
-The CFM inference problem is to solve this ordinary differential equation:
+The CFM inference problem is to solve this ODE:
 
 $$\frac{d\mathbf{z}}{dt} = v_\theta\!\left(t,\, \mathbf{z},\, \mathbf{z}_{\text{cond}}\right), \qquad \mathbf{z}(0) \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
 
@@ -331,7 +334,7 @@ Starting from random noise at $t = 0$, integrate the learned vector field forwar
 
 Euler's method approximates a continuous path by taking small discrete steps. At each step, evaluate the vector field at the current position and move in that direction by a small amount $\Delta t$.
 
-**Analogy:** you are navigating a river in fog. You cannot see the full path. At each moment you feel which way the current is pulling you and paddle in that direction for a few seconds, then check again. More checks (smaller $\Delta t$) means a more accurate path but more effort.
+**Analogy:** you're navigating a river in fog. You can't see the full path. At each moment you feel which way the current is pulling you and paddle that direction for a few seconds, then check again. More checks (smaller $\Delta t$) means a more accurate path but more effort.
 
 #### Euler step formula
 
@@ -354,11 +357,11 @@ Suppose the model forecasts one scalar latent value with $\mathbf{z}_{\text{cond
 | 2 | 0.50 | $0.99$ | $3.98$ | $0.99 + 0.25 \times 3.98 = \mathbf{2.00}$ |
 | 3 | 0.75 | $2.00$ | $4.02$ | $2.00 + 0.25 \times 4.02 = \mathbf{3.01}$ |
 
-Final $z_4 \approx 3.0$ — matches the target. Because the CFM path is a straight line, the true direction $u_t = 4.0$ is constant, so even 4 steps land on target. With a well-trained model and $N = 10$ (the PKCast default), the Euler path closely follows the learned straight-line vector field from noise to forecast.
+Final $z_4 \approx 3.0$, which matches the target. Because the CFM path is a straight line, the true direction $u_t = 4.0$ is constant, so even 4 steps land on target. With a well-trained model and $N = 10$ (the PKCast default), the Euler path closely follows the learned straight-line vector field from noise to forecast.
 
 #### Why not more steps?
 
-More steps reduce integration error but each step is one full transformer forward pass. PKCast uses `euler_steps=10` by default — enough to follow the near-linear CFM path accurately while keeping inference time practical. Diffusion models need 50–1000 steps because their curved score-function paths require much finer discretization to stay on track.
+More steps reduce integration error, but each step is one full transformer forward pass. PKCast uses `euler_steps=10` by default — enough to follow the near-linear CFM path accurately while keeping inference time practical. Diffusion models need 50–1000 steps because their curved score-function paths require much finer discretization to stay on track.
 
 ## Training workflow
 
@@ -381,7 +384,7 @@ Checkpoints are written under `artifacts/sevir/autoencoder_kl/<run_id>/models/`.
 
 ### 2. Generate the latent SEVIR dataset
 
-After training the autoencoder, encode the raw train and validation splits:
+After training, encode the raw train and validation splits:
 
 ```bash
 python scripts/encode_dataset.py \
@@ -446,19 +449,19 @@ Results on 3% of the SEVIR VIL test set (checkpoint `2026-04-22`, 1 probabilisti
 
 ### Metric definitions
 
-- **MSE**: Mean squared error between predicted VIL intensity and ground-truth VIL intensity. Lower is better.
-- **CRPS**: Continuous Ranked Probability Score. Measures the quality of probabilistic forecasts by comparing the predicted distribution with the observed value. Lower is better.
-- **CRPS (scaled)**: CRPS divided by the maximum VIL pixel value, 255, to report the score on a normalized scale. Lower is better.
-- **CSI**: Critical Success Index, also called threat score. For a chosen VIL threshold, `CSI = TP / (TP + FP + FN)`, where TP is hits, FP is false alarms, and FN is misses. Higher is better.
-- **CSI-M**: Mean CSI averaged across the configured VIL thresholds. Higher is better.
-- **CSI-M 16x16-pooled**: Mean CSI after spatial pooling over 16x16 neighborhoods. This gives credit for forecasts that are spatially close to the target storm region. Higher is better.
+- **MSE**: Mean squared error between predicted and ground-truth VIL intensity. Lower is better.
+- **CRPS**: Continuous Ranked Probability Score. Measures probabilistic forecast quality by comparing the predicted distribution against the observed value. Lower is better.
+- **CRPS (scaled)**: CRPS divided by the maximum VIL pixel value (255), reported on a normalized scale. Lower is better.
+- **CSI**: Critical Success Index, also called threat score. For a given VIL threshold, `CSI = TP / (TP + FP + FN)`, where TP is hits, FP is false alarms, and FN is misses. Higher is better.
+- **CSI-M**: Mean CSI across the configured VIL thresholds. Higher is better.
+- **CSI-M 16x16-pooled**: Mean CSI after spatial pooling over 16x16 neighborhoods. Gives partial credit for forecasts that are close to the target storm region spatially. Higher is better.
 - **HSS**: Heidke Skill Score. Measures categorical forecast skill relative to random chance using hits, misses, false alarms, and correct negatives. Higher is better.
-- **HSS-M**: Mean HSS averaged across thresholds. Higher is better.
-- **POD**: Probability of Detection, `POD = TP / (TP + FN)`. Measures how often observed threshold exceedances were detected. Higher is better.
-- **POD-M**: Mean POD averaged across thresholds. Higher is better.
-- **FAR**: False Alarm Ratio, `FAR = FP / (TP + FP)`. Measures the fraction of predicted threshold exceedances that did not occur. Lower is better.
-- **FAR-M**: Mean FAR averaged across thresholds. Lower is better.
-- **FSS**: Fractions Skill Score. Compares predicted and observed event fractions inside local spatial neighborhoods, making it useful for storm forecasts with small location errors. Higher is better.
+- **HSS-M**: Mean HSS across thresholds. Higher is better.
+- **POD**: Probability of Detection, `POD = TP / (TP + FN)`. How often observed threshold exceedances were detected. Higher is better.
+- **POD-M**: Mean POD across thresholds. Higher is better.
+- **FAR**: False Alarm Ratio, `FAR = FP / (TP + FP)`. Fraction of predicted threshold exceedances that didn't occur. Lower is better.
+- **FAR-M**: Mean FAR across thresholds. Lower is better.
+- **FSS**: Fractions Skill Score. Compares predicted and observed event fractions inside local spatial neighborhoods, useful for storm forecasts with small location errors. Higher is better.
 
 ### Summary metrics
 
@@ -503,7 +506,7 @@ Results on 3% of the SEVIR VIL test set (checkpoint `2026-04-22`, 1 probabilisti
 
 ## Slurm
 
-The `slurm/` directory contains cluster launch scripts with the current project paths and Conda environment:
+The `slurm/` directory has cluster launch scripts with the current project paths and Conda environment:
 
 ```bash
 sbatch slurm/train_autoencoder.sbatch
@@ -511,7 +514,7 @@ sbatch slurm/train_pkcast.sbatch
 sbatch slurm/inference.sbatch
 ```
 
-Edit the partition, GPU count, environment name, and data paths in these files before running on a different cluster.
+Edit the partition, GPU count, environment name, and data paths before running on a different cluster.
 
 ## Configuration
 
