@@ -4,7 +4,7 @@ Distributed training script for the PKCast model on the SEVIR dataset.
 This script uses `torchrun` for multi-GPU/multi-node training. It trains a
 Conditional Flow Matching (CFM) model with an Earthformer-style UNet backbone.
 Training is configured via a YAML file and includes features like partial evaluation,
-EMA checkpointing, early stopping, and WandB logging.
+EMA checkpointing, and early stopping.
 """
 
 import sys
@@ -1479,19 +1479,19 @@ def partial_evaluate_model(
             f"POD-M: {results.get('pod_from_mean_m', 'N/A')}, FSS-M: {results.get('fss_m_from_mean', 'N/A')}"
         )
 
-        EMA_SUFFIX_WANDB = "_EMA" if ema_model_evaluated else ""
+        EMA_METRIC_SUFFIX = "_EMA" if ema_model_evaluated else ""
         if enable_mlflow:
             mlflow.log_metrics(
                 {
-                    f"partial_mse{EMA_SUFFIX_WANDB}": results["mse_from_mean_mean"],
-                    f"partial_csi_m{EMA_SUFFIX_WANDB}": results["csi_from_mean_m"],
-                    f"partial_csi_pool_m{EMA_SUFFIX_WANDB}": results[
+                    f"partial_mse{EMA_METRIC_SUFFIX}": results["mse_from_mean_mean"],
+                    f"partial_csi_m{EMA_METRIC_SUFFIX}": results["csi_from_mean_m"],
+                    f"partial_csi_pool_m{EMA_METRIC_SUFFIX}": results[
                         "csi_pool_from_mean_m"
                     ],
-                    f"partial_hss_m{EMA_SUFFIX_WANDB}": results["hss_from_mean_m"],
-                    f"partial_far_m{EMA_SUFFIX_WANDB}": results["far_from_mean_m"],
-                    f"partial_pod_m{EMA_SUFFIX_WANDB}": results["pod_from_mean_m"],
-                    f"partial_fss_m{EMA_SUFFIX_WANDB}": results["fss_m_from_mean"],
+                    f"partial_hss_m{EMA_METRIC_SUFFIX}": results["hss_from_mean_m"],
+                    f"partial_far_m{EMA_METRIC_SUFFIX}": results["far_from_mean_m"],
+                    f"partial_pod_m{EMA_METRIC_SUFFIX}": results["pod_from_mean_m"],
+                    f"partial_fss_m{EMA_METRIC_SUFFIX}": results["fss_m_from_mean"],
                 },
                 step=global_step,
             )

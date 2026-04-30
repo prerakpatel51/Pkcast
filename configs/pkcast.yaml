@@ -76,7 +76,6 @@ data_params:
 
 run_params:
   debug_mode: false
-  enable_wandb: false
   enable_mlflow: true
   mlflow_experiment_name: "sevir-cfm"
   run_string: "cfm_pkcast_ddp"

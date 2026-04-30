@@ -17,7 +17,6 @@ import sys
 import os
 import time
 import uuid
-import wandb
 import datetime
 
 from omegaconf import OmegaConf
@@ -83,7 +82,6 @@ if not (0.0 <= args.test_data_percentage <= 1.0):
 config = OmegaConf.load(args.config)
 
 DEBUG_MODE = config.run_params.debug_mode
-ENABLE_WANDB = config.run_params.enable_wandb
 RUN_STRING = config.run_params.run_string
 
 BATCH_SIZE = config.test_params.micro_batch_size
@@ -269,22 +267,6 @@ def safe_decode(model, x):
         return model.module.decode(x)
     return model.decode(x)
 
-
-if ENABLE_WANDB:
-    wandb.init(
-        project="sevir-nowcasting-testing-cfm",
-        name=RUN_ID,
-        config={
-            "batch_size": BATCH_SIZE,
-            "num_workers": NUM_WORKERS,
-            "lag_time": LAG_TIME,
-            "lead_time": LEAD_TIME,
-            "time_spacing": TIME_SPACING,
-            "probabilistic_samples": PROBABILISTIC_SAMPLES,
-            "model": "pkcast",
-            "model_save_path": MODEL_SAVE_PATH,
-        },
-    )
 
 PRELOAD_MODEL = MODEL_SAVE_PATH if os.path.exists(MODEL_SAVE_PATH) else None
 if PRELOAD_MODEL is None:
@@ -630,22 +612,6 @@ else:
                 metrics_accumulators=metrics_accumulators,
                 thresholds=THRESHOLDS,
             )
-
-            if ENABLE_WANDB:
-                global_step = idx * batch_size_y_true
-                wandb.log(
-                    {
-                        "partial_mse": results["mse_from_mean_mean"],
-                        "partial_crps": results["crps_mean"],
-                        "partial_csi_m": results["csi_from_mean_m"],
-                        "partial_csi_pool_m": results["csi_pool_from_mean_m"],
-                        "partial_hss_m": results["hss_from_mean_m"],
-                        "partial_far_m": results["far_from_mean_m"],
-                        "partial_pod_m": results["pod_from_mean_m"],
-                        "partial_fss_m": results["fss_m_from_mean"],
-                    },
-                    step=global_step,
-                )
 
         if idx == 0:
             sample_pred = x_pred[0]

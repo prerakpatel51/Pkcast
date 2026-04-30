@@ -1,13 +1,10 @@
-# Wandb
-wandb/
-
 # Data
 datasets/sevir/data
 
 # Models / checkpoints
 saved_models/
 artifacts/
-
+.codex
 # MLflow
 mlruns/
 mlruns.db
