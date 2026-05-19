@@ -50,6 +50,32 @@ Validation reconstructions from the VAE at different points during training.
 | --- | --- |
 | <img src="readme_assets/pkcast_sample2_ground_truth.gif" alt="PKCast ground truth sequence 2" width="420"> | <img src="readme_assets/pkcast_sample2_prediction.gif" alt="PKCast predicted sequence 2" width="420"> |
 
+**Sample 3**
+
+| Ground truth | PKCast prediction |
+| --- | --- |
+| <img src="readme_assets/pkcast_sample3_ground_truth.gif" alt="PKCast ground truth sequence 3" width="420"> | <img src="readme_assets/pkcast_sample3_prediction.gif" alt="PKCast predicted sequence 3" width="420"> |
+
+**Sample 4**
+
+| Ground truth | PKCast prediction |
+| --- | --- |
+| <img src="readme_assets/pkcast_sample4_ground_truth.gif" alt="PKCast ground truth sequence 4" width="420"> | <img src="readme_assets/pkcast_sample4_prediction.gif" alt="PKCast predicted sequence 4" width="420"> |
+
+**Sample 5**
+
+| Ground truth | PKCast prediction |
+| --- | --- |
+| <img src="readme_assets/pkcast_sample5_ground_truth.gif" alt="PKCast ground truth sequence 5" width="420"> | <img src="readme_assets/pkcast_sample5_prediction.gif" alt="PKCast predicted sequence 5" width="420"> |
+
+**Sample 6**
+
+| Ground truth | PKCast prediction |
+| --- | --- |
+| <img src="readme_assets/pkcast_sample6_ground_truth.gif" alt="PKCast ground truth sequence 6" width="420"> | <img src="readme_assets/pkcast_sample6_prediction.gif" alt="PKCast predicted sequence 6" width="420"> |
+
+The additional forecasts above were generated on the `gpu2` partition using one A100 GPU. For 12 forecast frames with one probabilistic sample, measured prediction times were 4.4210 s, 3.3054 s, 3.2975 s, and 3.3007 s for Samples 3-6 respectively.
+
 ## What is included
 
 - Distributed VAE training for SEVIR VIL frames

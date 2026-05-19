@@ -6,6 +6,7 @@ import argparse
 import os
 import random
 import sys
+import time
 
 import matplotlib
 
@@ -97,6 +98,11 @@ def strip_module_prefix(state_dict):
         new_key = key.replace("module.", "") if key.startswith("module.") else key
         cleaned[new_key] = value
     return cleaned
+
+
+def sync_if_cuda(device):
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
 
 
 def save_gif(frames, metadata, output_path, title, fps, cartopy_features):
@@ -276,6 +282,8 @@ def main():
         t_future = x_true.shape[2]
         sample_predictions = []
 
+        sync_if_cuda(device)
+        prediction_start_time = time.perf_counter()
         for sample_idx in range(args.probabilistic_samples):
             torch.manual_seed(args.seed + sample_idx)
             x0_noise = torch.randn((bsz, t_future, hz, wz, cz), device=device)
@@ -314,6 +322,14 @@ def main():
             sample_predictions.append(x_pred_sample.unsqueeze(1))
 
         x_pred = torch.cat(sample_predictions, dim=1)
+        sync_if_cuda(device)
+        prediction_elapsed = time.perf_counter() - prediction_start_time
+        print(
+            "Prediction time "
+            f"for {t_future} frames "
+            f"({args.probabilistic_samples} sample(s)): "
+            f"{prediction_elapsed:.4f} seconds"
+        )
         x_pred = x_pred * cfm_model.std + cfm_model.mean
 
         bsz, samples, timesteps, h_lat, w_lat, c_lat = x_pred.shape
